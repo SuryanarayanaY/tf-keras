@@ -102,6 +102,11 @@ def convert_keras_imports(src_directory):
             f"from {PACKAGE_NAME} import",
             f"from {PACKAGE_NAME}.{SRC_DIRNAME} import",
         )
+        # Convert `import tf_keras as keras` into `import tf_keras.src as keras`
+        line = line.replace(
+            f"import {PACKAGE_NAME} as ",
+            f"import {PACKAGE_NAME}.{SRC_DIRNAME} as ",
+        )
         # A way to catch LazyLoader calls. Hacky.
         line = line.replace(
             'globals(), "tf_keras.', 'globals(), "tf_keras.src.'
@@ -296,6 +301,10 @@ def write_out_api_files(init_files_content, target_dir, root_offset=None):
     # create __init__.py file, populate file with public symbol imports.
     root_offset = root_offset or []
     for path, contents in init_files_content.items():
+        # Change pathnames from keras/layers -> tf_keras/layers so that
+        # APIs are created for `tf_keras`.
+        if path.startswith("keras"):
+            path = path.replace("keras", PACKAGE_NAME)
         os.makedirs(os.path.join(target_dir, path), exist_ok=True)
         init_file_lines = []
         modules_included = set()
@@ -446,6 +455,7 @@ def test_wheel(wheel_path, expected_version, requirements_path):
     try:
         # Check version is correct
         output = subprocess.check_output(script.encode(), shell=True)
+        print(f"DEBUG: {output}")
         output = output.decode().rstrip().split("\n")[-1].strip()
         if not output == expected_version:
             raise ValueError(
